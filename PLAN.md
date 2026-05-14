@@ -1,143 +1,206 @@
-# VTA Tennis Club — Admin Panel & Member Portal
+# VTA Tennis Club — Web Portal & Mobile App
 
-## Context
-Build a web application for a tennis club that provides:
-- A member-facing portal where users register/login and view their membership details
-- An admin panel for managing all member records and exporting data
-- A PostgreSQL membership database
+## Overview
 
-Tech stack: Django + PostgreSQL (blank slate project at `/Users/pwiens/Documents/Claude/Projects/VTA`).
+Two-phase project building a web portal and mobile app for a tennis club.
+
+- **Phase 1:** Web portal — member-facing dashboard + polished admin panel
+- **Phase 2:** Mobile app — iOS & Android using the same Firebase backend
+
+---
+
+## Tech Stack
+
+### Phase 1 — Web Portal
+| Layer | Technology |
+|---|---|
+| Frontend framework | React (Vite) |
+| Admin panel | React Admin + Firebase data provider |
+| Authentication | Firebase Auth (email/password) |
+| Database | Firestore (NoSQL) |
+| Hosting | Firebase Hosting |
+| Styling | Material UI (bundled with React Admin) + Bootstrap 5 (member portal) |
+
+### Phase 2 — Mobile App
+| Layer | Technology |
+|---|---|
+| Framework | Expo (React Native) |
+| Backend | Same Firebase project as Phase 1 |
+| Payments | Stripe (React Native SDK) |
 
 ---
 
 ## Project Structure
 
 ```
-VTA/
-├── .env                        # Secrets (gitignored)
+vta/
+├── .env                          # Firebase secrets (gitignored)
 ├── .gitignore
-├── requirements.txt
-├── manage.py
-├── config/                     # Django project package
-│   ├── settings.py
-│   ├── urls.py
-│   └── wsgi.py
-├── accounts/                   # Custom User model + auth views
-│   ├── models.py               # CustomUser (email as USERNAME_FIELD)
-│   ├── forms.py                # RegistrationForm, LoginForm
-│   ├── views.py                # register, login_view, logout_view
-│   └── urls.py
-├── members/                    # Membership data + portal
-│   ├── models.py               # MemberProfile (OneToOne -> CustomUser)
-│   ├── admin.py                # ModelAdmin + CSV export action
-│   ├── views.py                # dashboard (login_required)
-│   └── urls.py
-└── templates/
-    ├── base.html               # Shared layout (Bootstrap 5 via CDN)
-    ├── accounts/
-    │   ├── register.html
-    │   └── login.html
-    └── members/
-        └── dashboard.html
+├── package.json
+├── vite.config.js
+├── index.html
+├── firebase.json                 # Firebase Hosting config
+├── .firebaserc                   # Firebase project alias
+├── src/
+│   ├── main.jsx                  # App entry point
+│   ├── App.jsx                   # Router setup
+│   ├── firebase/
+│   │   ├── config.js             # Firebase init (reads from .env)
+│   │   └── auth.js               # Auth helper functions
+│   ├── components/
+│   │   ├── ProtectedRoute.jsx    # Redirects unauthenticated users to login
+│   │   └── AdminRoute.jsx        # Redirects non-admins away from /admin
+│   ├── pages/
+│   │   ├── Login.jsx
+│   │   ├── Register.jsx
+│   │   └── Dashboard.jsx         # Read-only member profile view
+│   ├── admin/
+│   │   ├── index.jsx             # React Admin app entry
+│   │   ├── dataProvider.js       # Firestore data provider for React Admin
+│   │   ├── authProvider.js       # Firebase auth provider for React Admin
+│   │   └── resources/
+│   │       └── members/
+│   │           ├── MemberList.jsx
+│   │           ├── MemberEdit.jsx
+│   │           └── MemberShow.jsx
+│   └── styles/
+│       └── index.css
 ```
 
 ---
 
-## Database Models
+## Firestore Data Models
 
-### `accounts.CustomUser` (extends AbstractBaseUser)
+### Collection: `users`
+Created automatically on registration via Firebase Auth trigger.
+
 | Field | Type |
 |---|---|
-| email | EmailField (unique, USERNAME_FIELD) |
-| first_name | CharField |
-| last_name | CharField |
-| is_active | BooleanField |
-| is_staff | BooleanField |
-| date_joined | DateTimeField |
+| uid | string (matches Firebase Auth UID) |
+| email | string |
+| firstName | string |
+| lastName | string |
+| isAdmin | boolean (default: false) |
+| createdAt | timestamp |
 
-`AUTH_USER_MODEL = 'accounts.CustomUser'` — **must be set before first migration.**
+### Collection: `memberProfiles`
+One document per user. Created automatically on registration.
 
-### `members.MemberProfile` (OneToOne → CustomUser)
 | Field | Type |
 |---|---|
-| user | OneToOneField(CustomUser) |
-| phone | CharField |
-| street | CharField |
-| city | CharField |
-| state | CharField |
-| zip_code | CharField |
-| membership_start | DateField |
-| membership_expiry | DateField |
-| payment_status | CharField (TextChoices: paid/unpaid/pending) |
-| level | DecimalField (max_digits=2, decimal_places=1, choices: 1.0–5.0 in 0.5 steps, blank=True) |
-
-Level choices defined as a tuple: `[(Decimal('1.0'), '1.0'), (Decimal('1.5'), '1.5'), ..., (Decimal('5.0'), '5.0')]`
-
-MemberProfile is auto-created via a `post_save` signal on CustomUser.
+| userId | string (reference to users UID) |
+| phone | string |
+| street | string |
+| city | string |
+| state | string |
+| zipCode | string |
+| membershipStart | timestamp |
+| membershipExpiry | timestamp |
+| paymentStatus | string (paid / unpaid / pending) |
+| level | number (1.0–5.0 in 0.5 steps, nullable) |
 
 ---
 
 ## URL Routes
 
-| URL | View | Name |
+| Route | Component | Access |
 |---|---|---|
-| `/accounts/register/` | accounts.views.register | register |
-| `/accounts/login/` | accounts.views.login_view | login |
-| `/accounts/logout/` | accounts.views.logout_view | logout |
-| `/members/dashboard/` | members.views.dashboard | member_dashboard |
-| `/admin/` | Django admin | — |
-| `/` | Redirect (dashboard or login) | — |
+| `/` | Redirect → dashboard or login | — |
+| `/login` | Login.jsx | Public |
+| `/register` | Register.jsx | Public |
+| `/dashboard` | Dashboard.jsx | Authenticated users only |
+| `/admin` | React Admin app | Admin users only |
+| `/admin/members` | MemberList.jsx | Admin users only |
+| `/admin/members/:id` | MemberShow.jsx / MemberEdit.jsx | Admin users only |
 
 ---
 
-## Key Views & Forms
+## Key Components
 
-### accounts app
-- **RegistrationForm**: extends UserCreationForm for CustomUser (email, first_name, last_name, password); includes `level` field from MemberProfile as a Select widget with choices 1.0–5.0
-- **register view**: validates form → creates user → creates MemberProfile with `level` saved from form → logs in → redirects to dashboard
-- **login_view**: wraps `django.contrib.auth.authenticate` + `login`
-- **logout_view**: calls `django.contrib.auth.logout` → redirects to login
+### Member Portal
+- **Login.jsx** — email/password login via Firebase Auth
+- **Register.jsx** — creates Firebase Auth user + Firestore `users` doc + blank `memberProfiles` doc
+- **Dashboard.jsx** — read-only view of the logged-in user's `memberProfiles` document
+- **ProtectedRoute.jsx** — checks Firebase Auth state; redirects to `/login` if unauthenticated
+- **AdminRoute.jsx** — checks `isAdmin` flag in Firestore `users` doc; redirects non-admins
 
-### members app
-- **dashboard view** (`@login_required`): fetches `request.user.profile`, renders read-only membership details
-- Admin manages all create/edit/delete via `/admin/`
-
----
-
-## Admin Panel (`members/admin.py`)
-
-- `@admin.register(MemberProfile)` with `list_display`, `list_filter`, `search_fields`
-- **CSV export action**: Django admin action that streams all selected member records as a downloadable `.csv` file using Python's built-in `csv` module (no extra packages needed)
-- Columns: First Name, Last Name, Email, Phone, Street, City, State, Zip, Start Date, Expiry Date, Payment Status, Level
+### Admin Panel (React Admin)
+- **MemberList** — paginated, searchable, filterable table of all member profiles
+- **MemberEdit** — form to edit any member's profile fields
+- **MemberShow** — read-only detail view
+- **CSV Export** — React Admin's built-in `<ExportButton>` handles CSV download
+- **dataProvider.js** — connects React Admin to Firestore using `ra-data-firestore`
+- **authProvider.js** — connects React Admin login/logout to Firebase Auth
 
 ---
 
-## Packages (`requirements.txt`)
+## Packages (`package.json`)
 
 ```
-Django>=4.2,<5.0
-psycopg2-binary>=2.9
-python-decouple>=3.8
+react
+react-dom
+react-router-dom
+firebase
+react-admin
+ra-data-firestore
+@mui/material
+@emotion/react
+@emotion/styled
+vite
+@vitejs/plugin-react
 ```
-
-`python-decouple` reads `.env` so secrets never touch source code.
 
 ---
 
-## Setup Sequence (critical order)
+## Firebase Services Required
 
-1. Create virtualenv, install packages, `pip freeze > requirements.txt`
-2. `django-admin startproject config .`
-3. `python manage.py startapp accounts` and `startapp members`
-4. **Set `AUTH_USER_MODEL = 'accounts.CustomUser'` in `settings.py` BEFORE any migrations**
-5. Add apps to `INSTALLED_APPS`, configure DB from `.env`, set `TEMPLATES DIRS`, `LOGIN_URL`, `LOGIN_REDIRECT_URL`
-6. Write `CustomUser` + `CustomUserManager` → `makemigrations accounts`
-7. Write `MemberProfile` + signal → `makemigrations members`
-8. `python manage.py migrate`
-9. Wire up all URLs, write views, forms, templates
-10. Configure `MemberProfileAdmin` with CSV action
-11. `python manage.py createsuperuser`
-12. `python manage.py runserver`
+- **Authentication** — Email/Password provider enabled
+- **Firestore** — Native mode, production rules (see below)
+- **Hosting** — Single-page app rewrite rule (`/**` → `/index.html`)
+
+---
+
+## Firestore Security Rules
+
+```
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Users can read/write their own user doc
+    match /users/{userId} {
+      allow read, write: if request.auth.uid == userId;
+      allow read: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    // Users can read their own profile; admins can read/write all
+    match /memberProfiles/{profileId} {
+      allow read: if request.auth.uid == resource.data.userId;
+      allow read, write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+  }
+}
+```
+
+---
+
+## Setup Sequence
+
+1. Create Firebase project at console.firebase.google.com
+2. Enable **Authentication** → Email/Password
+3. Enable **Firestore** → Start in production mode
+4. Enable **Hosting**
+5. Install Firebase CLI: `npm install -g firebase-tools`
+6. `firebase login` and `firebase init` (select Hosting + Firestore)
+7. `npm create vite@latest vta -- --template react`
+8. Install dependencies: `npm install firebase react-router-dom react-admin ra-data-firestore @mui/material @emotion/react @emotion/styled`
+9. Create `.env` with Firebase config values
+10. Write `firebase/config.js` (reads from `.env`)
+11. Build auth flows: Login, Register, ProtectedRoute, AdminRoute
+12. Build member Dashboard
+13. Build React Admin panel (dataProvider, authProvider, resources)
+14. Write and deploy Firestore security rules
+15. `firebase deploy`
 
 ---
 
@@ -145,6 +208,28 @@ python-decouple>=3.8
 
 - Register a new account → verify redirect to dashboard showing blank profile
 - Log out → log back in → verify dashboard loads
-- Visit `/admin/` as superuser → add/edit/delete a member record
-- Select members in admin list → run "Export selected members as CSV" action → verify download
-- Attempt to visit `/members/dashboard/` while logged out → verify redirect to login
+- Attempt `/dashboard` while logged out → verify redirect to `/login`
+- Attempt `/admin` as a regular user → verify redirect away
+- Log in as admin → verify member list loads in React Admin
+- Edit a member record in admin → verify Firestore updates
+- Export members as CSV from admin → verify download
+- Attempt to read another user's profile via Firestore rules → verify denied
+
+---
+
+## Phase 2 — Mobile App (Future)
+
+- Initialise Expo project: `npx create-expo-app vta-mobile`
+- Connect to same Firebase project
+- Implement login, registration, and member dashboard screens in React Native
+- Add Stripe SDK for program registration payments
+- Submit to App Store (iOS) and Google Play (Android)
+
+---
+
+## Future Considerations
+
+- **Background jobs** (e.g. expiry reminder emails) → Firebase Functions
+- **File uploads** (e.g. waivers) → Firebase Storage
+- **Program registration** → new Firestore collection + Stripe integration
+- **Push notifications** → Firebase Cloud Messaging (FCM)
