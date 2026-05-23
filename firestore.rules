@@ -1,0 +1,48 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAdmin() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    match /users/{userId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+    match /memberProfiles/{profileId} {
+      allow read: if isOwner(resource.data.userId) || isAdmin();
+      allow write: if isOwner(request.resource.data.userId) || isAdmin();
+    }
+    match /memberships/{membershipId} {
+      allow read: if isOwner(resource.data.userId) || isAdmin();
+      allow create: if isOwner(request.resource.data.userId);
+      allow update, delete: if isAdmin();
+    }
+
+    match /playSessions/{sessionId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+
+    // Phase 2+ stubs
+    match /programs/{programId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+    match /programRegistrations/{regId} {
+      allow read: if isOwner(resource.data.userId) || isAdmin();
+      allow write: if isAdmin();
+    }
+    match /rankings/{rankingId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+    match /matchResults/{matchId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+  }
+}
