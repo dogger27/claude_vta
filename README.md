@@ -1,16 +1,45 @@
-# React + Vite
+# Vancouver Tennis Association — Member Portal
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Web portal for the Vancouver Tennis Association (VTA), built with React and Firebase.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+### Member Portal
+- Registration with email validation, phone, postal/zip code, and NTRP self-rating
+- Profile management (photo upload with crop, contact info, GLTA & Tennis Canada member IDs)
+- Membership status, renewal via Stripe, and transaction history
 
-## React Compiler
+### Admin Panel
+- Member list with search, export, and full profile editing
+- Play Sessions spreadsheet (inline-editable schedule)
+- Programs management
+- Permission-based access (admin + active membership required)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Tech Stack
 
-## Expanding the ESLint configuration
+| Layer | Technology |
+|---|---|
+| Frontend | React (Vite) |
+| Admin panel | React Admin |
+| Auth & Database | Firebase (Auth, Firestore) |
+| File storage | Firebase Storage |
+| Payments | Stripe (Cloud Functions) |
+| Hosting | Firebase Hosting |
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Local Development
+
+```bash
+npm install
+npm run dev        # starts localhost:5173
+```
+
+Requires a `.env` file with Firebase config values (not committed — contact the project owner).
+
+## Deployment
+
+```bash
+npm run build
+firebase deploy
+```
+
+Live at: https://vancouver-tennis-association.web.app
